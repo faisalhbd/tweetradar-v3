@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TweetRadar — Setup</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090e;--surface:#0d1017;--surface2:#111520;--border:#1a2035;--border2:#232b40;--accent:#1d9bf0;--accent2:#00d4ff;--green:#22c55e;--red:#f43f5e;--text:#dde3f0;--muted:#5a6480;--muted2:#8892aa;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+background-image:radial-gradient(ellipse 50% 40% at 15% 30%,rgba(29,155,240,0.08) 0%,transparent 70%),radial-gradient(ellipse 40% 50% at 85% 70%,rgba(0,212,255,0.05) 0%,transparent 60%);}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;width:100%;max-width:520px;box-shadow:0 0 80px rgba(29,155,240,0.06);}
+.brand{margin-bottom:28px;}
+.brand-name{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:var(--accent);}
+.brand-name span{color:var(--accent2);}
+.brand-sub{font-size:0.7rem;color:var(--muted);margin-top:4px;letter-spacing:1px;}
+.setup-title{font-family:'Syne',sans-serif;font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px;}
+.setup-desc{font-size:0.72rem;color:var(--muted);margin-bottom:28px;line-height:1.6;}
+.field{margin-bottom:18px;}
+.field-label{font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;}
+.field-input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;padding:11px 14px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.83rem;outline:none;transition:border-color .2s;}
+.field-input:focus{border-color:var(--accent);}
+.field-hint{font-size:0.66rem;color:var(--muted);margin-top:5px;line-height:1.5;}
+.test-btn{font-size:0.65rem;padding:3px 10px;border-radius:5px;border:1px solid var(--border2);background:transparent;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .15s;}
+.test-btn:hover{border-color:var(--accent);color:var(--accent);}
+.test-result{font-size:0.68rem;margin-top:5px;display:none;}
+.test-result.ok{color:var(--green);}
+.test-result.err{color:var(--red);}
+.time-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px;}
+.time-opt{position:relative;}
+.time-opt input{position:absolute;opacity:0;}
+.time-opt label{display:block;padding:9px 6px;border-radius:8px;border:1px solid var(--border2);font-size:0.72rem;text-align:center;cursor:pointer;transition:all .15s;color:var(--muted2);}
+.time-opt input:checked+label{border-color:var(--accent);color:var(--accent);background:rgba(29,155,240,0.08);}
+.time-opt label:hover{border-color:var(--border);color:var(--text);}
+.submit-btn{width:100%;margin-top:24px;background:var(--accent);border:none;border-radius:10px;padding:14px;color:#fff;font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;cursor:pointer;letter-spacing:.3px;transition:background .2s,transform .1s;}
+.submit-btn:hover{background:#1a8cd8;}
+.submit-btn:active{transform:scale(.98);}
+.error-box{background:rgba(244,63,94,.1);border:1px solid rgba(244,63,94,.3);border-radius:9px;padding:12px 16px;font-size:0.78rem;color:var(--red);margin-bottom:20px;}
+.divider{border:none;border-top:1px solid var(--border);margin:24px 0;}
+.step-badge{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:rgba(29,155,240,0.15);color:var(--accent);font-size:0.65rem;font-weight:700;margin-right:6px;}
+.loader{display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <div class="brand-name">Tweet<span>Radar</span></div>
+    <div class="brand-sub">// KEYWORD MONITOR — SETUP</div>
+  </div>
+
+  {% if error %}
+  <div class="error-box">⚠ {{ error }}</div>
+  {% endif %}
+
+  <div class="setup-title">
+    {% if existing %}⚙️ Update Configuration{% else %}🚀 First Time Setup{% endif %}
+  </div>
+  <div class="setup-desc">
+    Enter your own API keys below. Each user's data is completely isolated.
+    Don't have keys yet? See hints below each field.
+  </div>
+
+  <form method="POST" id="setupForm">
+
+    <!-- Twitter API -->
+    <div class="field">
+      <div class="field-label">
+        <span><span class="step-badge">1</span>TwitterAPI.io Key</span>
+        <button type="button" class="test-btn" onclick="testTwitter()">Test ✓</button>
+      </div>
+      <input class="field-input" type="password" name="twitter_key" id="twitter_key"
+             placeholder="your_twitterapi_io_key" value="{{ prefill.get('twitter_key','') }}" required>
+      <div class="field-hint">Get your key at <strong>twitterapi.io</strong> → Dashboard → API Keys</div>
+      <div class="test-result" id="twResult"></div>
+    </div>
+
+    <!-- Telegram Bot Token -->
+    <div class="field">
+      <div class="field-label">
+        <span><span class="step-badge">2</span>Telegram Bot Token</span>
+        <button type="button" class="test-btn" onclick="testTelegram()">Test ✓</button>
+      </div>
+      <input class="field-input" type="password" name="tg_token" id="tg_token"
+             placeholder="123456789:ABCdef..." value="{{ prefill.get('tg_token','') }}" required>
+      <div class="field-hint">Create bot via <strong>@BotFather</strong> on Telegram → /newbot</div>
+      <div class="test-result" id="tgResult"></div>
+    </div>
+
+    <!-- Telegram Chat ID -->
+    <div class="field">
+      <div class="field-label">
+        <span><span class="step-badge">3</span>Telegram Chat ID</span>
+      </div>
+      <input class="field-input" type="text" name="tg_chat_id" id="tg_chat_id"
+             placeholder="123456789" value="{{ prefill.get('tg_chat_id','') }}" required>
+      <div class="field-hint">Send any message to your bot → open<br>
+        <code style="color:var(--accent2)">https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code><br>
+        → find <code>"id"</code> inside <code>"chat"</code>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Tweet Age Filter -->
+    <div class="field">
+      <div class="field-label"><span><span class="step-badge">4</span>Tweet Age Filter</span></div>
+      <div class="time-grid">
+        <div class="time-opt">
+          <input type="radio" name="time_filter" id="tf_rt" value="realtime"
+                 {% if prefill.get('time_filter','1h')=='realtime' %}checked{% endif %}>
+          <label for="tf_rt">⚡ Real-time</label>
+        </div>
+        <div class="time-opt">
+          <input type="radio" name="time_filter" id="tf_1h" value="1h"
+                 {% if prefill.get('time_filter','1h') in ('1h','') or not prefill %}checked{% endif %}>
+          <label for="tf_1h">🕐 Last 1h</label>
+        </div>
+        <div class="time-opt">
+          <input type="radio" name="time_filter" id="tf_2h" value="2h"
+                 {% if prefill.get('time_filter')=='2h' %}checked{% endif %}>
+          <label for="tf_2h">🕑 Last 2h</label>
+        </div>
+        <div class="time-opt">
+          <input type="radio" name="time_filter" id="tf_6h" value="6h"
+                 {% if prefill.get('time_filter')=='6h' %}checked{% endif %}>
+          <label for="tf_6h">🕕 Last 6h</label>
+        </div>
+        <div class="time-opt">
+          <input type="radio" name="time_filter" id="tf_24h" value="24h"
+                 {% if prefill.get('time_filter')=='24h' %}checked{% endif %}>
+          <label for="tf_24h">📅 Last 24h</label>
+        </div>
+        <div class="time-opt">
+          <input type="radio" name="time_filter" id="tf_48h" value="48h"
+                 {% if prefill.get('time_filter')=='48h' %}checked{% endif %}>
+          <label for="tf_48h">📆 Last 48h</label>
+        </div>
+      </div>
+      <div class="field-hint" style="margin-top:8px">⚡ Real-time = only newest tweets (max 5 min old). Recommended: 1h for best results.</div>
+    </div>
+
+    <button type="submit" class="submit-btn" id="submitBtn">
+      {% if existing %}💾 Save & Restart Monitor{% else %}🚀 Start Monitoring{% endif %}
+    </button>
+  </form>
+</div>
+
+<script>
+function showResult(id, ok, msg) {
+  const el = document.getElementById(id);
+  el.style.display = 'block';
+  el.className = 'test-result ' + (ok ? 'ok' : 'err');
+  el.textContent = msg;
+}
+
+async function testTwitter() {
+  const key = document.getElementById('twitter_key').value.trim();
+  if (!key) return showResult('twResult', false, '⚠ Enter API key first');
+  showResult('twResult', true, '⏳ Testing...');
+  const r = await fetch('/api/test/twitter', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({key})
+  });
+  const d = await r.json();
+  showResult('twResult', d.ok, d.ok ? d.msg : d.error);
+}
+
+async function testTelegram() {
+  const token   = document.getElementById('tg_token').value.trim();
+  const chat_id = document.getElementById('tg_chat_id').value.trim();
+  if (!token || !chat_id) return showResult('tgResult', false, '⚠ Enter token & chat ID first');
+  showResult('tgResult', true, '⏳ Sending test message...');
+  const r = await fetch('/api/test/telegram', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({token, chat_id})
+  });
+  const d = await r.json();
+  showResult('tgResult', d.ok, d.ok ? d.msg : d.error);
+}
+
+document.getElementById('setupForm').onsubmit = () => {
+  const btn = document.getElementById('submitBtn');
+  btn.innerHTML = '<span class="loader"></span> Starting...';
+  btn.disabled = true;
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TweetRadar Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{--bg:#07090e;--surface:#0d1017;--surface2:#111520;--border:#1a2035;--border2:#232b40;--accent:#1d9bf0;--accent2:#00d4ff;--green:#22c55e;--red:#f43f5e;--yellow:#f59e0b;--text:#dde3f0;--muted:#5a6480;--muted2:#8892aa;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 40% at 10% 20%,rgba(29,155,240,0.05) 0%,transparent 70%),radial-gradient(ellipse 40% 60% at 90% 80%,rgba(0,212,255,0.04) 0%,transparent 60%);pointer-events:none;z-index:0;}
+
+/* LAYOUT */
+.shell{display:flex;min-height:100vh;position:relative;z-index:1;}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;}
+.main{margin-left:220px;flex:1;padding:28px 32px;}
+
+/* SIDEBAR */
+.brand{padding:22px 20px 18px;border-bottom:1px solid var(--border);}
+.brand-name{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;color:var(--accent);}
+.brand-name span{color:var(--accent2);}
+.brand-sub{font-size:0.6rem;color:var(--muted);margin-top:2px;letter-spacing:1px;}
+.monitor-status{margin:12px 20px 0;display:flex;align-items:center;gap:8px;font-size:0.68rem;color:var(--muted2);}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;flex-shrink:0;}
+.dot.off{background:var(--red);box-shadow:0 0 6px var(--red);animation:none;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.nav{padding:18px 12px;flex:1;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:0.77rem;color:var(--muted2);transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;}
+.nav-item:hover,.nav-item.active{background:rgba(29,155,240,0.1);color:var(--accent);}
+.nav-item svg{width:15px;height:15px;flex-shrink:0;}
+.sidebar-bottom{padding:14px 20px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;}
+.config-btn{font-size:0.68rem;color:var(--muted2);background:none;border:1px solid var(--border2);border-radius:6px;padding:6px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .15s;display:flex;align-items:center;gap:6px;}
+.config-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;}
+.page-title{font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:700;}
+.page-title span{color:var(--accent);}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+
+/* STAT CARDS */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.stat-card.c-blue::before{background:linear-gradient(90deg,var(--accent),transparent);}
+.stat-card.c-cyan::before{background:linear-gradient(90deg,var(--accent2),transparent);}
+.stat-card.c-green::before{background:linear-gradient(90deg,var(--green),transparent);}
+.stat-card.c-yellow::before{background:linear-gradient(90deg,var(--yellow),transparent);}
+.stat-label{font-size:0.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.stat-value{font-family:'Syne',sans-serif;font-size:1.9rem;font-weight:700;line-height:1;}
+.c-blue .stat-value{color:var(--accent);}
+.c-cyan .stat-value{color:var(--accent2);}
+.c-green .stat-value{color:var(--green);}
+.c-yellow .stat-value{color:var(--yellow);}
+
+/* SECTIONS */
+.section{display:none;}
+.section.active{display:block;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;}
+.card-title{font-family:'Syne',sans-serif;font-size:0.82rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:0.76rem;cursor:pointer;transition:all .15s;border:none;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#1a8cd8;}
+.btn-success{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);}
+.btn-success:hover{background:rgba(34,197,94,.25);}
+.btn-danger{background:rgba(244,63,94,.1);color:var(--red);border:1px solid rgba(244,63,94,.2);}
+.btn-danger:hover{background:rgba(244,63,94,.2);}
+.btn-ghost{background:transparent;color:var(--muted2);border:1px solid var(--border2);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-sm{padding:5px 9px;font-size:0.68rem;}
+.btn-pause{font-family:'Syne',sans-serif;font-weight:700;font-size:0.82rem;padding:9px 18px;}
+
+/* INPUTS */
+input[type=text],input[type=number],input[type=password],select,textarea{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 13px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.8rem;outline:none;transition:border-color .2s;width:100%;}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);}
+.input-row{display:flex;gap:9px;margin-bottom:14px;}
+.input-row input{flex:1;}
+select option{background:var(--surface2);}
+
+/* KEYWORDS TABLE */
+.kw-table{width:100%;border-collapse:collapse;}
+.kw-table th{font-size:0.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:7px 10px;border-bottom:1px solid var(--border);text-align:left;}
+.kw-table td{padding:9px 10px;border-bottom:1px solid var(--border);font-size:0.78rem;vertical-align:middle;}
+.kw-table tr:last-child td{border-bottom:none;}
+.kw-table tr:hover td{background:rgba(29,155,240,0.03);}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.63rem;font-weight:600;cursor:pointer;user-select:none;}
+.badge-on{background:rgba(34,197,94,.15);color:var(--green);}
+.badge-off{background:rgba(244,63,94,.1);color:var(--red);}
+
+/* TWEET FEED */
+.feed-filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.chip{padding:4px 11px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted2);font-size:0.7rem;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .15s;}
+.chip:hover,.chip.active{border-color:var(--accent);color:var(--accent);background:rgba(29,155,240,0.07);}
+.tweet-list{display:flex;flex-direction:column;gap:10px;}
+.tweet-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;transition:border-color .15s;}
+.tweet-card:hover{border-color:var(--border2);}
+.tw-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;}
+.tw-user{display:flex;align-items:center;gap:8px;}
+.tw-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:#fff;flex-shrink:0;}
+.tw-uname{font-size:0.8rem;color:var(--accent);}
+.tw-time{font-size:0.65rem;color:var(--muted);}
+.tw-kw{font-size:0.62rem;padding:2px 7px;border-radius:4px;background:rgba(0,212,255,0.08);color:var(--accent2);border:1px solid rgba(0,212,255,0.18);}
+.tw-text{font-size:0.78rem;color:var(--muted2);line-height:1.5;margin-bottom:8px;}
+.tw-footer{display:flex;align-items:center;gap:12px;}
+.tw-stat{font-size:0.68rem;color:var(--muted);}
+.tw-link{font-size:0.7rem;color:var(--accent);text-decoration:none;margin-left:auto;}
+.tw-link:hover{text-decoration:underline;}
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:0.78rem;}
+
+/* SETTINGS */
+.settings-2col{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.s-group{margin-bottom:18px;}
+.s-label{font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:7px;display:block;}
+.s-hint{font-size:0.65rem;color:var(--muted);margin-top:4px;line-height:1.5;}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);}
+.toggle-row:last-child{border-bottom:none;}
+.tl-name{font-size:0.8rem;}
+.tl-sub{font-size:0.65rem;color:var(--muted);margin-top:2px;}
+.toggle{position:relative;width:38px;height:21px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.tg-sl{position:absolute;inset:0;background:var(--border2);border-radius:11px;cursor:pointer;transition:background .2s;}
+.tg-sl:before{content:'';position:absolute;width:15px;height:15px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;}
+.toggle input:checked+.tg-sl{background:var(--accent);}
+.toggle input:checked+.tg-sl:before{transform:translateX(17px);}
+
+/* API CONFIG SECTION */
+.api-field{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;}
+.api-field-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.api-field-label{font-size:0.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;}
+.api-val-row{display:flex;gap:8px;}
+.api-val-row input{flex:1;font-size:0.78rem;}
+.test-res{font-size:0.68rem;margin-top:6px;display:none;}
+.test-res.ok{color:var(--green);}
+.test-res.err{color:var(--red);}
+
+/* TIME FILTER GRID */
+.tf-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.tf-opt{position:relative;}
+.tf-opt input{position:absolute;opacity:0;}
+.tf-opt label{display:block;padding:8px 4px;border-radius:7px;border:1px solid var(--border2);font-size:0.7rem;text-align:center;cursor:pointer;transition:all .15s;color:var(--muted2);}
+.tf-opt input:checked+label{border-color:var(--accent);color:var(--accent);background:rgba(29,155,240,0.08);}
+
+/* CHARTS */
+.chart-wrap{position:relative;height:200px;}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:11px 16px;font-size:0.76rem;z-index:9999;transform:translateY(60px);opacity:0;transition:all .3s;pointer-events:none;max-width:300px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.ok{border-color:rgba(34,197,94,.4);color:var(--green);}
+.toast.err{border-color:rgba(244,63,94,.4);color:var(--red);}
+
+/* IMPORT */
+.import-drop{border:2px dashed var(--border2);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px;}
+.import-drop:hover,.import-drop.drag{border-color:var(--accent);background:rgba(29,155,240,0.04);}
+.import-drop p{font-size:0.75rem;color:var(--muted);margin-top:6px;}
+
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-name">Tweet<span>Radar</span></div>
+    <div class="brand-sub">// KEYWORD MONITOR v3</div>
+  </div>
+  <div class="monitor-status">
+    <div class="dot" id="monDot"></div>
+    <span id="monLabel">Loading...</span>
+  </div>
+  <nav class="nav">
+    <button class="nav-item active" onclick="nav('overview',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Overview
+    </button>
+    <button class="nav-item" onclick="nav('keywords',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>Keywords
+    </button>
+    <button class="nav-item" onclick="nav('feed',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/></svg>Tweet Feed
+    </button>
+    <button class="nav-item" onclick="nav('analytics',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Analytics
+    </button>
+    <button class="nav-item" onclick="nav('settings',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41"/></svg>Settings
+    </button>
+    <button class="nav-item" onclick="nav('apiconfig',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>API Config
+    </button>
+  </nav>
+  <div class="sidebar-bottom">
+    <button class="btn btn-pause" id="pauseBtn" onclick="toggleMonitor()">⏸ Pause</button>
+    <a href="/setup" class="config-btn">⚙️ Reconfigure</a>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div class="page-title" id="pgTitle">Overview <span>//</span></div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm" onclick="window.location='/api/export/csv'">⬇ CSV</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadAll()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="stats-grid">
+    <div class="stat-card c-blue"><div class="stat-label">Total Tweets</div><div class="stat-value" id="sTot">—</div></div>
+    <div class="stat-card c-green"><div class="stat-label">Today</div><div class="stat-value" id="sToday">—</div></div>
+    <div class="stat-card c-cyan"><div class="stat-label">Active KW</div><div class="stat-value" id="sKWA">—</div></div>
+    <div class="stat-card c-yellow"><div class="stat-label">Total KW</div><div class="stat-value" id="sKWT">—</div></div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="section active" id="sec-overview">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Top Keywords</div>
+        <div id="topKwList"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Recent Tweets</div>
+        <div id="overviewFeed"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEYWORDS -->
+  <div class="section" id="sec-keywords">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Add Keyword</div>
+      <div class="input-row">
+        <input type="text" id="kwInp" placeholder="bitcoin price" onkeydown="if(event.key==='Enter')addKw()">
+        <button class="btn btn-primary" onclick="addKw()">+ Add</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Import File / Paste
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer">📂 Upload <input type="file" accept=".txt,.csv" style="display:none" onchange="importFile(this)"></label>
+      </div>
+      <div class="import-drop" id="impDrop" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+        <p>Drag & drop .txt or .csv here</p>
+      </div>
+      <textarea id="pasteArea" rows="3" placeholder="Or paste keywords here, one per line..."></textarea>
+      <button class="btn btn-primary" style="margin-top:10px" onclick="importPaste()">Import Pasted</button>
+    </div>
+    <div class="card">
+      <div class="card-title">All Keywords <span id="kwCnt" style="color:var(--muted);font-size:0.68rem;font-weight:400"></span></div>
+      <div style="overflow-x:auto">
+        <table class="kw-table">
+          <thead><tr><th>Keyword</th><th>Active</th><th>Alert</th><th>Hits</th><th>Added</th><th>Del</th></tr></thead>
+          <tbody id="kwBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEED -->
+  <div class="section" id="sec-feed">
+    <div class="card">
+      <div class="card-title">Live Tweet Feed <button class="btn btn-ghost btn-sm" onclick="loadFeed()">↻</button></div>
+      <div class="feed-filters">
+        <span style="font-size:0.68rem;color:var(--muted)">Age:</span>
+        <button class="chip active" onclick="setHours(null,this)">All</button>
+        <button class="chip" onclick="setHours(1,this)">1h</button>
+        <button class="chip" onclick="setHours(2,this)">2h</button>
+        <button class="chip" onclick="setHours(6,this)">6h</button>
+        <button class="chip" onclick="setHours(24,this)">24h</button>
+        <span style="font-size:0.68rem;color:var(--muted);margin-left:6px">KW:</span>
+        <select id="feedKwSel" onchange="loadFeed()" style="width:auto;padding:4px 9px;font-size:0.7rem">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="tweet-list" id="tweetList"><div class="empty">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div class="section" id="sec-analytics">
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="card"><div class="card-title">Tweets per Keyword</div><div class="chart-wrap"><canvas id="cKW"></canvas></div></div>
+      <div class="card"><div class="card-title">Tweets per Day (7d)</div><div class="chart-wrap"><canvas id="cDay"></canvas></div></div>
+    </div>
+    <div class="card"><div class="card-title">Top Users</div><div id="topUsers"></div></div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="section" id="sec-settings">
+    <div class="settings-2col">
+      <div class="card">
+        <div class="card-title">Monitor</div>
+        <div class="s-group">
+          <label class="s-label">Poll Interval</label>
+          <select id="s_poll">
+            <option value="180">3 minutes</option>
+            <option value="300">5 minutes ⭐</option>
+            <option value="600">10 minutes</option>
+            <option value="900">15 minutes</option>
+          </select>
+          <div class="s-hint">Night 00-06 UTC → auto ×6 slower (saves API cost)</div>
+        </div>
+        <div class="s-group">
+          <label class="s-label">Tweet Age Filter</label>
+          <div class="tf-grid">
+            <div class="tf-opt"><input type="radio" name="stf" id="stf_rt" value="realtime"><label for="stf_rt">⚡ Real-time</label></div>
+            <div class="tf-opt"><input type="radio" name="stf" id="stf_1h" value="1h"><label for="stf_1h">🕐 1h</label></div>
+            <div class="tf-opt"><input type="radio" name="stf" id="stf_2h" value="2h"><label for="stf_2h">🕑 2h</label></div>
+            <div class="tf-opt"><input type="radio" name="stf" id="stf_6h" value="6h"><label for="stf_6h">🕕 6h</label></div>
+            <div class="tf-opt"><input type="radio" name="stf" id="stf_24h" value="24h"><label for="stf_24h">📅 24h</label></div>
+            <div class="tf-opt"><input type="radio" name="stf" id="stf_48h" value="48h"><label for="stf_48h">📆 48h</label></div>
+          </div>
+        </div>
+        <div class="s-group">
+          <label class="s-label">Location Filter</label>
+          <select id="s_loc">
+            <option value="USA">🇺🇸 USA only</option>
+            <option value="all">🌍 All locations</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Spam Filters</div>
+        <div class="toggle-row"><div><div class="tl-name">Skip Retweets</div><div class="tl-sub">Ignore RT @ posts</div></div><label class="toggle"><input type="checkbox" id="s_rt"><span class="tg-sl"></span></label></div>
+        <div class="toggle-row"><div><div class="tl-name">Skip Replies</div><div class="tl-sub">Ignore @mention replies</div></div><label class="toggle"><input type="checkbox" id="s_rep"><span class="tg-sl"></span></label></div>
+        <div class="s-group" style="margin-top:14px">
+          <label class="s-label">Min Followers</label>
+          <input type="number" id="s_mf" min="0">
+          <div class="s-hint">Accounts below = filtered</div>
+        </div>
+        <div class="s-group">
+          <label class="s-label">Max Alerts / User / Hour</label>
+          <input type="number" id="s_mau" min="1" max="20">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="s-group"><label class="s-label">Min Likes</label><input type="number" id="s_ml" min="0"></div>
+          <div class="s-group"><label class="s-label">Min Retweets</label><input type="number" id="s_mr" min="0"></div>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:right;margin-top:12px">
+      <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+    </div>
+  </div>
+
+  <!-- API CONFIG -->
+  <div class="section" id="sec-apiconfig">
+    <div class="card" style="max-width:600px">
+      <div class="card-title">API Configuration</div>
+      <p style="font-size:0.75rem;color:var(--muted);margin-bottom:20px">Update your API keys anytime. Changes take effect immediately.</p>
+
+      <div class="api-field">
+        <div class="api-field-header">
+          <span class="api-field-label">TwitterAPI.io Key</span>
+          <button class="btn btn-ghost btn-sm" onclick="testTw()">Test ✓</button>
+        </div>
+        <div class="api-val-row">
+          <input type="password" id="cfg_tw" placeholder="●●●●●●●●">
+          <button class="btn btn-ghost btn-sm" onclick="toggleVis('cfg_tw',this)">👁</button>
+        </div>
+        <div class="test-res" id="twRes"></div>
+      </div>
+
+      <div class="api-field">
+        <div class="api-field-header">
+          <span class="api-field-label">Telegram Bot Token</span>
+          <button class="btn btn-ghost btn-sm" onclick="testTg()">Test ✓</button>
+        </div>
+        <div class="api-val-row">
+          <input type="password" id="cfg_tgt" placeholder="●●●●●●●●">
+          <button class="btn btn-ghost btn-sm" onclick="toggleVis('cfg_tgt',this)">👁</button>
+        </div>
+        <div class="test-res" id="tgRes"></div>
+      </div>
+
+      <div class="api-field">
+        <div class="api-field-header"><span class="api-field-label">Telegram Chat ID</span></div>
+        <input type="text" id="cfg_tgc" placeholder="123456789">
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:6px;width:100%" onclick="saveKeys()">💾 Save & Restart Monitor</button>
+    </div>
+  </div>
+
+</main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+let feedHours = null;
+let cKW = null, cDay = null;
+let monActive = true;
+
+// ── NAV ──
+const titles = {
+  overview:'Overview <span>//</span>',keywords:'Keywords <span>//</span>',
+  feed:'Tweet Feed <span>//</span>',analytics:'Analytics <span>//</span>',
+  settings:'Settings <span>//</span>',apiconfig:'API Config <span>//</span>'
+};
+function nav(name, btn) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('pgTitle').innerHTML = titles[name];
+  if(name==='feed') loadFeed();
+  if(name==='analytics') loadAnalytics();
+  if(name==='settings') loadSettings();
+  if(name==='keywords') loadKeywords();
+  if(name==='apiconfig') loadApiConfig();
+}
+
+// ── TOAST ──
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className=`toast ${type} show`;
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+// ── STATS ──
+async function loadStats() {
+  const r = await fetch('/api/stats'); const d = await r.json();
+  document.getElementById('sTot').textContent   = d.total_tweets.toLocaleString();
+  document.getElementById('sToday').textContent = d.today_tweets.toLocaleString();
+  document.getElementById('sKWA').textContent   = d.active_keywords;
+  document.getElementById('sKWT').textContent   = d.total_keywords;
+  monActive = d.monitor_active === '1' && d.monitor_running;
+  const dot = document.getElementById('monDot');
+  dot.className = 'dot' + (monActive?'':' off');
+  document.getElementById('monLabel').textContent = monActive?'Monitoring ON':'Paused';
+  document.getElementById('pauseBtn').textContent = monActive?'⏸ Pause':'▶ Resume';
+  // Top keywords
+  const kHtml = d.top_keywords.map(k=>
+    `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.78rem">
+      <span>${esc(k.keyword)}</span><span style="color:var(--accent2)">${k.hit_count} hits</span>
+    </div>`).join('') || noData();
+  document.getElementById('topKwList').innerHTML = kHtml;
+}
+
+// ── MONITOR ──
+async function toggleMonitor(){
+  const r=await fetch('/api/monitor/toggle',{method:'POST'});
+  const d=await r.json();
+  monActive=d.active&&d.running;
+  document.getElementById('monDot').className='dot'+(monActive?'':' off');
+  document.getElementById('monLabel').textContent=monActive?'Monitoring ON':'Paused';
+  document.getElementById('pauseBtn').textContent=monActive?'⏸ Pause':'▶ Resume';
+  toast(monActive?'▶ Monitor resumed':'⏸ Monitor paused');
+}
+
+// ── KEYWORDS ──
+async function loadKeywords(){
+  const r=await fetch('/api/keywords'); const kws=await r.json();
+  document.getElementById('kwCnt').textContent=`(${kws.length})`;
+  const sel=document.getElementById('feedKwSel');
+  const prev=sel.value;
+  sel.innerHTML='<option value="">All</option>'+
+    kws.map(k=>`<option value="${esc(k.keyword)}"${k.keyword===prev?' selected':''}>${esc(k.keyword)}</option>`).join('');
+  const body=document.getElementById('kwBody');
+  if(!kws.length){body.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">No keywords yet</td></tr>`;return;}
+  body.innerHTML=kws.map(k=>`<tr>
+    <td style="font-weight:500">${esc(k.keyword)}</td>
+    <td><span class="badge ${k.active?'badge-on':'badge-off'}" onclick="toggleKw(${k.id},'active')">${k.active?'ON':'OFF'}</span></td>
+    <td><span class="badge ${k.alert_on?'badge-on':'badge-off'}" onclick="toggleKw(${k.id},'alert_on')">${k.alert_on?'🔔':'🔕'}</span></td>
+    <td style="color:var(--accent2)">${k.hit_count}</td>
+    <td style="color:var(--muted);font-size:0.7rem">${(k.created_at||'').slice(0,10)}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="delKw(${k.id})">✕</button></td>
+  </tr>`).join('');
+}
+async function addKw(){
+  const inp=document.getElementById('kwInp'); const kw=inp.value.trim();
+  if(!kw) return;
+  const r=await fetch('/api/keywords',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keyword:kw})});
+  const d=await r.json();
+  if(d.ok){inp.value='';loadKeywords();loadStats();toast(`✅ Added: ${kw}`);}
+  else toast(`⚠ ${d.error}`,'err');
+}
+async function delKw(id){
+  if(!confirm('Delete?')) return;
+  await fetch(`/api/keywords/${id}`,{method:'DELETE'});
+  loadKeywords();loadStats();toast('🗑 Deleted');
+}
+async function toggleKw(id,field){
+  await fetch(`/api/keywords/${id}/toggle/${field}`,{method:'POST'});
+  loadKeywords();
+}
+async function importFile(inp){
+  const fd=new FormData(); fd.append('file',inp.files[0]);
+  const r=await fetch('/api/keywords/import',{method:'POST',body:fd});
+  const d=await r.json(); inp.value='';
+  loadKeywords();loadStats();toast(`✅ Imported ${d.added} (${d.skipped} skipped)`);
+}
+async function importPaste(){
+  const txt=document.getElementById('pasteArea').value.trim(); if(!txt) return;
+  const r=await fetch('/api/keywords/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keywords:txt})});
+  const d=await r.json(); document.getElementById('pasteArea').value='';
+  loadKeywords();loadStats();toast(`✅ Imported ${d.added} (${d.skipped} skipped)`);
+}
+function handleDrop(e){
+  e.preventDefault();document.getElementById('impDrop').classList.remove('drag');
+  const fd=new FormData(); fd.append('file',e.dataTransfer.files[0]);
+  fetch('/api/keywords/import',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    loadKeywords();loadStats();toast(`✅ Imported ${d.added} (${d.skipped} skipped)`);
+  });
+}
+
+// ── FEED ──
+function setHours(h,btn){
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  btn.classList.add('active'); feedHours=h; loadFeed();
+}
+async function loadFeed(){
+  const kw=document.getElementById('feedKwSel').value;
+  let url=`/api/tweets?limit=30`;
+  if(feedHours) url+=`&hours=${feedHours}`;
+  if(kw) url+=`&keyword=${encodeURIComponent(kw)}`;
+  const r=await fetch(url); const tweets=await r.json();
+  renderOverview(tweets.slice(0,5));
+  const list=document.getElementById('tweetList');
+  list.innerHTML=tweets.length ? tweets.map(tweetCard).join('') : '<div class="empty">📭 No tweets for this filter</div>';
+}
+function renderOverview(tweets){
+  const el=document.getElementById('overviewFeed');
+  el.innerHTML=tweets.length ? tweets.map(t=>
+    `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:0.76rem">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="color:var(--accent)">@${esc(t.username)}</span>
+        <span style="color:var(--muted);font-size:0.65rem">${(t.logged_at||'').slice(11,16)}</span>
+      </div>
+      <div style="color:var(--muted2);line-height:1.4">${esc((t.text||'').slice(0,90))}${(t.text||'').length>90?'...':''}</div>
+    </div>`).join('') : noData();
+}
+function tweetCard(t){
+  return `<div class="tweet-card">
+    <div class="tw-header">
+      <div class="tw-user">
+        <div class="tw-avatar">${esc((t.username||'?')[0].toUpperCase())}</div>
+        <div><div class="tw-uname">@${esc(t.username)}</div><div class="tw-time">${(t.created_at||t.logged_at||'').slice(0,16)}</div></div>
+      </div>
+      <span class="tw-kw">${esc(t.keyword)}</span>
+    </div>
+    <div class="tw-text">${esc(t.text||'')}</div>
+    <div class="tw-footer">
+      <span class="tw-stat">❤️ ${t.likes||0}</span>
+      <span class="tw-stat">🔁 ${t.retweets||0}</span>
+      <span class="tw-stat">👥 ${t.followers||0}</span>
+      <a href="${esc(t.tweet_url||'#')}" target="_blank" class="tw-link">View →</a>
+    </div>
+  </div>`;
+}
+
+// ── ANALYTICS ──
+async function loadAnalytics(){
+  const r=await fetch('/api/analytics'); const d=await r.json();
+  if(cKW) cKW.destroy();
+  cKW=new Chart(document.getElementById('cKW'),{type:'bar',data:{
+    labels:d.per_keyword.map(x=>x.keyword),
+    datasets:[{data:d.per_keyword.map(x=>x.count),backgroundColor:'rgba(29,155,240,0.55)',borderColor:'#1d9bf0',borderWidth:1,borderRadius:4}]
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'#1a2035'}},y:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'#1a2035'}}}}});
+  if(cDay) cDay.destroy();
+  cDay=new Chart(document.getElementById('cDay'),{type:'line',data:{
+    labels:d.per_day.map(x=>x.day),
+    datasets:[{data:d.per_day.map(x=>x.count),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.07)',fill:true,tension:0.4,pointRadius:4,pointBackgroundColor:'#00d4ff'}]
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'#1a2035'}},y:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'#1a2035'}}}}});
+  document.getElementById('topUsers').innerHTML=d.top_users.map(u=>
+    `<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:0.78rem">
+      <span style="color:var(--accent)">@${esc(u.username)}</span><span style="color:var(--muted2)">${u.count} tweets</span>
+    </div>`).join('') || noData();
+}
+
+// ── SETTINGS ──
+async function loadSettings(){
+  const r=await fetch('/api/settings'); const s=await r.json();
+  document.getElementById('s_poll').value = s.poll_interval||'300';
+  const tfEl = document.querySelector(`input[name="stf"][value="${s.time_filter||'1h'}"]`);
+  if(tfEl) tfEl.checked=true;
+  document.getElementById('s_loc').value  = s.location_filter||'USA';
+  document.getElementById('s_rt').checked  = s.skip_retweets==='1';
+  document.getElementById('s_rep').checked = s.skip_replies==='1';
+  document.getElementById('s_mf').value   = s.min_followers||'10';
+  document.getElementById('s_mau').value  = s.max_alerts_per_user||'3';
+  document.getElementById('s_ml').value   = s.min_likes||'0';
+  document.getElementById('s_mr').value   = s.min_retweets||'0';
+}
+async function saveSettings(){
+  const tf = document.querySelector('input[name="stf"]:checked');
+  const data={
+    poll_interval: document.getElementById('s_poll').value,
+    time_filter:   tf ? tf.value : '1h',
+    location_filter: document.getElementById('s_loc').value,
+    skip_retweets: document.getElementById('s_rt').checked?'1':'0',
+    skip_replies:  document.getElementById('s_rep').checked?'1':'0',
+    min_followers: document.getElementById('s_mf').value,
+    max_alerts_per_user: document.getElementById('s_mau').value,
+    min_likes:     document.getElementById('s_ml').value,
+    min_retweets:  document.getElementById('s_mr').value,
+  };
+  await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  toast('✅ Settings saved!');
+}
+
+// ── API CONFIG ──
+async function loadApiConfig(){
+  const r=await fetch('/api/settings'); const s=await r.json();
+  document.getElementById('cfg_tgc').value = s.tg_chat_id||'';
+  // Don't fill token/key fields — user must retype for security
+}
+async function saveKeys(){
+  const tw  = document.getElementById('cfg_tw').value.trim();
+  const tgt = document.getElementById('cfg_tgt').value.trim();
+  const tgc = document.getElementById('cfg_tgc').value.trim();
+  if(!tw||!tgt||!tgc){toast('⚠ All fields required','err');return;}
+  const r=await fetch('/setup',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({twitter_key:tw,tg_token:tgt,tg_chat_id:tgc,time_filter:'1h'})});
+  if(r.ok&&r.redirected) toast('✅ Keys saved & monitor restarted!');
+  else toast('✅ Keys updated!');
+  document.getElementById('cfg_tw').value='';
+  document.getElementById('cfg_tgt').value='';
+  loadStats();
+}
+async function testTw(){
+  const key=document.getElementById('cfg_tw').value.trim();
+  if(!key){showRes('twRes',false,'Enter key first');return;}
+  showRes('twRes',true,'⏳ Testing...');
+  const r=await fetch('/api/test/twitter',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
+  const d=await r.json(); showRes('twRes',d.ok,d.ok?d.msg:d.error);
+}
+async function testTg(){
+  const token=document.getElementById('cfg_tgt').value.trim();
+  const chat_id=document.getElementById('cfg_tgc').value.trim();
+  if(!token||!chat_id){showRes('tgRes',false,'Enter token & chat ID first');return;}
+  showRes('tgRes',true,'⏳ Testing...');
+  const r=await fetch('/api/test/telegram',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,chat_id})});
+  const d=await r.json(); showRes('tgRes',d.ok,d.ok?d.msg:d.error);
+}
+function showRes(id,ok,msg){const el=document.getElementById(id);el.style.display='block';el.className='test-res '+(ok?'ok':'err');el.textContent=msg;}
+function toggleVis(id,btn){const el=document.getElementById(id);el.type=el.type==='password'?'text':'password';btn.textContent=el.type==='password'?'👁':'🙈';}
+
+// ── UTILS ──
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function noData(){return '<div style="color:var(--muted);font-size:0.75rem;padding:10px 0">No data yet</div>';}
+
+// ── INIT ──
+async function loadAll(){await loadStats();await loadFeed();}
+loadAll();
+loadKeywords();
+setInterval(loadAll, 30000);
+</script>
+</body>
+</html>
