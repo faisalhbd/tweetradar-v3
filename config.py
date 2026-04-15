@@ -13,16 +13,16 @@ SECRET_KEY           = os.getenv("SECRET_KEY", "tweetradar-secret-change-me-xyz"
 SESSION_COOKIE_DAYS  = 30
 
 # ─── Monitor defaults ───
-POLL_INTERVAL_SEC       = 5 * 60    # 5 min
-NIGHT_POLL_INTERVAL_SEC = 30 * 60   # 30 min (00-06 UTC)
-MAX_RESULTS_PER_KW      = 10
+POLL_INTERVAL_SEC       = 15 * 60   # 15 min (was 5 min — reduced to save credits)
+NIGHT_POLL_INTERVAL_SEC = 60 * 60   # 60 min (00-06 UTC)
+MAX_RESULTS_PER_KW      = 5         # was 10 — fewer results = fewer credits
 TWEET_TEXT_LIMIT        = 200
 
 # ─── Spam filter defaults ───
 DEFAULT_SETTINGS = {
     "monitor_active":      "1",
-    "poll_interval":       "300",
-    "time_filter":         "1h",       # default: last 1 hour
+    "poll_interval":       "900",      # 15 min (was 300 = 5 min)
+    "time_filter":         "realtime", # realtime = no within_time filter (cheaper)
     "location_filter":     "USA",
     "min_followers":       "10",
     "skip_retweets":       "1",

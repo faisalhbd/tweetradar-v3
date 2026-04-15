@@ -17,6 +17,10 @@ log = logging.getLogger("monitor")
 _threads: dict[str, threading.Thread] = {}
 _stop_flags: dict[str, threading.Event] = {}
 
+# Per-user, per-keyword last seen tweet ID (in-memory, resets on restart)
+# Structure: {uid: {keyword: since_id}}
+_since_ids: dict[str, dict[str, str]] = {}
+
 
 # ══════════════════════════════════════════
 #  SPAM FILTER
@@ -62,13 +66,17 @@ def build_query(keyword: str, settings: dict) -> str:
     query = keyword
     if settings.get("location_filter") == "USA":
         query += " place_country:US lang:en"
-    tf = settings.get("time_filter", "1h")
+    tf = settings.get("time_filter", "realtime")
     if tf != "realtime":
         query += f" within_time:{tf}"
     return query
 
 
-def search_tweets(twitter_key: str, keyword: str, settings: dict) -> list:
+def search_tweets(twitter_key: str, keyword: str, settings: dict, since_id: str = None) -> list:
+    """
+    Fetch tweets for a keyword.
+    since_id: only return tweets newer than this ID → avoids re-fetching old tweets → saves credits.
+    """
     url     = "https://api.twitterapi.io/twitter/tweet/advanced_search"
     headers = {"X-API-Key": twitter_key}
     params  = {
@@ -76,6 +84,8 @@ def search_tweets(twitter_key: str, keyword: str, settings: dict) -> list:
         "queryType": "Latest",
         "count":     int(settings.get("max_results", config.MAX_RESULTS_PER_KW)),
     }
+    if since_id:
+        params["sinceId"] = since_id
     try:
         r = requests.get(url, headers=headers, params=params, timeout=15)
         r.raise_for_status()
@@ -129,7 +139,7 @@ def send_startup_msg(tg_token: str, tg_chat_id: str, kw_count: int):
         f"🚀 *TweetRadar Started\\!*\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"📋 Keywords: *{kw_count}* active\n"
-        f"⏱ Poll: *Every 5 min* \\(30min 00\\-06 UTC\\)\n"
+        f"⏱ Poll: *Every 15 min* \\(60min 00\\-06 UTC\\)\n"
         f"✅ Monitoring is ON\\!"
     )
     try:
@@ -189,6 +199,10 @@ def _user_loop(uid: str, stop_event: threading.Event):
     except Exception:
         pass
 
+    # Init since_id store for this user
+    if uid not in _since_ids:
+        _since_ids[uid] = {}
+
     while not stop_event.is_set():
         cycle_start = time.time()
 
@@ -216,12 +230,25 @@ def _user_loop(uid: str, stop_event: threading.Event):
         for kw_row in keywords:
             if stop_event.is_set():
                 break
-            keyword = kw_row["keyword"]
-            tweets  = search_tweets(twitter_key, keyword, settings)
+            keyword  = kw_row["keyword"]
+            since_id = _since_ids[uid].get(keyword)  # last seen tweet ID
+
+            tweets = search_tweets(twitter_key, keyword, settings, since_id=since_id)
+
+            # Track highest tweet ID seen this cycle to use as since_id next cycle
+            max_id_this_cycle = since_id
 
             for tweet in tweets:
                 tweet_id = str(tweet.get("id") or tweet.get("id_str", ""))
-                if not tweet_id or db.tweet_exists(uid, tweet_id):
+                if not tweet_id:
+                    continue
+
+                # Update max_id (tweet IDs are sortable — higher = newer)
+                if not max_id_this_cycle or tweet_id > max_id_this_cycle:
+                    max_id_this_cycle = tweet_id
+
+                # Skip already processed tweets (belt-and-suspenders with since_id)
+                if db.tweet_exists(uid, tweet_id):
                     continue
 
                 spammy, reason = is_spam(uid, tweet, keyword)
@@ -238,6 +265,11 @@ def _user_loop(uid: str, stop_event: threading.Event):
                         db.log_user_alert(uid, data["username"])
                         new_count += 1
                         stop_event.wait(0.5)
+
+            # Save the latest tweet ID for next cycle — avoids re-fetching old tweets
+            if max_id_this_cycle:
+                _since_ids[uid][keyword] = max_id_this_cycle
+                log.debug(f"[{uid[:8]}] '{keyword}' since_id updated → {max_id_this_cycle}")
 
             stop_event.wait(1.2)
 
