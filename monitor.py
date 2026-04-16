@@ -34,8 +34,25 @@ def is_spam(uid: str, tweet: dict, keyword: str) -> tuple[bool, str]:
     likes     = tweet.get("likeCount") or tweet.get("favorite_count", 0) or 0
     rts       = tweet.get("retweetCount") or tweet.get("retweet_count", 0) or 0
 
-    if s.get("skip_retweets") == "1" and text.strip().startswith("RT @"):
+    # Retweet detection — text prefix + API boolean/object fields
+    is_rt = (
+        text.strip().startswith("RT @")
+        or tweet.get("isRetweet") is True
+        or tweet.get("retweeted_status") is not None
+        or tweet.get("retweetedTweet") is not None
+    )
+    if s.get("skip_retweets") == "1" and is_rt:
         return True, "retweet"
+
+    # Quote tweet detection — original tweet ache but re-shared
+    is_quote = (
+        tweet.get("isQuote") is True
+        or tweet.get("quoted_status") is not None
+        or tweet.get("quotedTweet") is not None
+    )
+    if s.get("skip_retweets") == "1" and is_quote:
+        return True, "quote_tweet"
+
     if s.get("skip_replies") == "1" and text.strip().startswith("@"):
         return True, "reply"
     if followers < int(s.get("min_followers", 10)):
@@ -64,11 +81,21 @@ def is_spam(uid: str, tweet: dict, keyword: str) -> tuple[bool, str]:
 # ══════════════════════════════════════════
 def build_query(keyword: str, settings: dict) -> str:
     query = keyword
+
+    # Filter out retweets and quote tweets at the API query level
+    if settings.get("skip_retweets") == "1":
+        query += " -is:retweet -is:quote"
+
     if settings.get("location_filter") == "USA":
         query += " place_country:US lang:en"
+
     tf = settings.get("time_filter", "realtime")
-    if tf != "realtime":
+    if tf == "realtime":
+        # Realtime = last 10 minutes only — ensures fresh tweets
+        query += " within_time:10m"
+    else:
         query += f" within_time:{tf}"
+
     return query
 
 
@@ -139,7 +166,8 @@ def send_startup_msg(tg_token: str, tg_chat_id: str, kw_count: int):
         f"🚀 *TweetRadar Started\\!*\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"📋 Keywords: *{kw_count}* active\n"
-        f"⏱ Poll: *Every 15 min* \\(60min 00\\-06 UTC\\)\n"
+        f"⏱ Poll: *Every 5 min* \\(15min 00\\-06 UTC\\)\n"
+        f"🔍 Mode: *Realtime* \\(last 10 min tweets only\\)\n"
         f"✅ Monitoring is ON\\!"
     )
     try:
@@ -243,8 +271,8 @@ def _user_loop(uid: str, stop_event: threading.Event):
                 if not tweet_id:
                     continue
 
-                # Update max_id (tweet IDs are sortable — higher = newer)
-                if not max_id_this_cycle or tweet_id > max_id_this_cycle:
+                # Update max_id — integer comparison (string compare breaks on "9" > "10")
+                if not max_id_this_cycle or int(tweet_id) > int(max_id_this_cycle):
                     max_id_this_cycle = tweet_id
 
                 # Skip already processed tweets (belt-and-suspenders with since_id)
