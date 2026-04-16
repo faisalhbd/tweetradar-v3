@@ -59,7 +59,7 @@ def setup():
         twitter_key = request.form.get("twitter_key", "").strip()
         tg_token    = request.form.get("tg_token", "").strip()
         tg_chat_id  = request.form.get("tg_chat_id", "").strip()
-        time_filter = request.form.get("time_filter", "1h")
+        time_filter = request.form.get("time_filter", "realtime")
 
         if not twitter_key or not tg_token or not tg_chat_id:
             return render_template("setup.html",
@@ -94,7 +94,7 @@ def setup():
             "twitter_key": u.get("twitter_key", ""),
             "tg_token":    u.get("tg_token", ""),
             "tg_chat_id":  u.get("tg_chat_id", ""),
-            "time_filter": db.get_setting(uid, "time_filter", "1h"),
+            "time_filter": db.get_setting(uid, "time_filter", "realtime"),
         }
 
     return render_template("setup.html", error=None,
