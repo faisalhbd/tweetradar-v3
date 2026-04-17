@@ -10,7 +10,7 @@ DB_PATH  = DATA_DIR / "tweetradar.db"
 MAX_USERS            = 5
 DASHBOARD_PORT       = int(os.getenv("PORT", 8080))
 SECRET_KEY           = os.getenv("SECRET_KEY", "tweetradar-secret-change-me-xyz")
-SESSION_COOKIE_DAYS  = 30
+SESSION_COOKIE_DAYS  = 365  # 1 year — browser close e expire hobe na
 
 # ─── Monitor defaults ───
 POLL_INTERVAL_SEC       = 5 * 60    # 5 min — realtime monitoring
@@ -23,7 +23,7 @@ DEFAULT_SETTINGS = {
     "monitor_active":      "1",
     "poll_interval":       "300",      # 5 min — realtime
     "time_filter":         "realtime", # within_time:10m applied automatically
-    "location_filter":     "USA",
+    "location_filter":     "none",     # USA filter too restrictive — off by default
     "min_followers":       "10",
     "skip_retweets":       "1",
     "skip_replies":        "1",
