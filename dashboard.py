@@ -5,6 +5,7 @@ Multi-user, cookie-based sessions, setup wizard
 import io
 import csv
 import requests
+from datetime import timedelta
 from functools import wraps
 from flask import (Flask, render_template, request, jsonify,
                    redirect, url_for, session, Response, make_response)
@@ -14,6 +15,13 @@ import config
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=config.SESSION_COOKIE_DAYS)
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True  # browser close e cookie expire hobe na
 
 
 # ══════════════════════════════════════════
@@ -75,6 +83,7 @@ def setup():
                     existing=False, prefill={})
             uid = db.create_user()
             session["uid"] = uid
+            session.permanent = True
 
         db.update_user_keys(uid, twitter_key, tg_token, tg_chat_id)
         db.set_setting(uid, "time_filter", time_filter)
