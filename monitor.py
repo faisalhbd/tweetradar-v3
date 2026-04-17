@@ -86,8 +86,9 @@ def build_query(keyword: str, settings: dict) -> str:
     if settings.get("skip_retweets") == "1":
         query += " -is:retweet -is:quote"
 
-    if settings.get("location_filter") == "USA":
-        query += " place_country:US lang:en"
+    # Always English — catches USA tweets without place_country filter
+    # (place_country:US drops ~80% of tweets since most users don't set location)
+    query += " lang:en"
 
     tf = settings.get("time_filter", "realtime")
     if tf == "realtime":
